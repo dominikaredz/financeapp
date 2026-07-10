@@ -4,7 +4,7 @@ import sqlite3
 from ai_categorized import rozpoznaj_kategorie_zbiorczo
 
 path_to_db = r'E:\Programowanie\FinanceApp\finance_db.sqlite'
-path_to_csv = 'wyciag.csv'
+path_to_csv = r'E:\Programowanie\wyciag.csv'
 
 # 2. TUTAJ ŁADUJEMY KONFIGURACJĘ (Robimy to raz, przed uruchomieniem pętli)
 try:
