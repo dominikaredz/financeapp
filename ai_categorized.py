@@ -1,59 +1,93 @@
+import os
 import json
 from groq import Groq
-import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# --- ŁADOWANIE KONFIGURACJI ---
+folder_projektu = r'E:\Programowanie\FinanceApp'
+load_dotenv(dotenv_path=os.path.join(folder_projektu, '.env'))
 
-API_KEY = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=API_KEY)
+# Inicjalizacja klienta Groq
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
-def rozpoznaj_kategorie_zbiorczo(lista_opisow):
-    # Przekształcamy listę w ponumerowany tekst, np. "0: KAUFLAND\n1: ROSSMANN"
-    sklepy_tekst = "\n".join([f"{i}: {opis}" for i, opis in enumerate(lista_opisow)])
+def analizuj_powiadomienie_przez_ai(tresc_pusha):
+    """
+    Funkcja wysyła pełną treść powiadomienia z telefonu do Llama 3.
+    Model wyciąga z tekstu kwotę, sklep i dopasowuje ID kategorii zgodnie z bazą danych.
+    """
 
     prompt = f"""
-    Jesteś ekspertem od finansów osobistych. Twoim zadaniem jest przypisanie poniższych opisów transakcji do odpowiednich kategorii.
+    Jesteś precyzyjnym parserem danych finansowych. Twoim zadaniem jest przeanalizować listę powiadomień push z banku/portfela płatniczego i wyciągnąć z nich dane.
 
-    Dostępne kategorie (ID - Nazwa):
-    1 - Jedzenie
-    2 - Chemia gospodarcza
-    3 - Subskrypcje
-    4 - Bank
-    5 - Kosmetyki
-    6 - Transport
-    7 - Rachunki
-    8 - Leki
-    9 - Mieszkanie
-    10 - Ubrania
-    11 - Rozrywka/Wyjazdy
-    12 - Inne
+    Oto powiadomienia do analizy:
+    "{tresc_pusha}"
 
-    Przeanalizuj poniższą listę transakcji (format to INDEKS: OPIS):
-    {sklepy_tekst}
+    Musisz zwrócić wyłącznie JEDEN obiekt JSON zawierający klucz "transakcje", który jest listą obiektów.
+    Każdy obiekt na liście musi zawierać klucze:
+    - "kwota": liczba zmiennoprzecinkowa (np. 46.33)
+    - "sklep": oczyszczona z niepotrzebnych dopisków i numerów nazwa sprzedawcy/miejsca (np. "Kaufland", "Żabka"). Jeśli to przelew przychodzący bez danych nadawcy, wpisz "Przelew Przychodzący".
+    - "kategoria_id": liczba całkowita reprezentująca ID kategorii dobraną na podstawie bazy danych.
+    - "typ": tekst, który musi przyjąć wyłącznie wartość "WYDATEK" lub "PRZYCHOD".
 
-    Zwróć wynik WYŁĄCZNIE jako czysty obiekt JSON, gdzie kluczem jest INDEKS (jako string lub liczba), a wartością jest ID kategorii (liczba).
-    Nie pisz żadnych wstępów, wyjaśnień ani znaczników markdown typu ```json. Tylko czysty JSON.
-    Przykład wyniku: {{"0": 1, "1": 5, "2": 12}}
+    Wybierz odpowiednie "kategoria_id" STRICTE na podstawie poniższej listy:
+    1 - Jedzenie (sklepy spożywcze, supermarkety, restauracje, Żabka, Biedronka, Lidl, Kaufland, UberEats, kawiarnie)
+    2 - Chemia gospodarcza (środki czystości, zakupy do domu, proszki itp.)
+    3 - Subskrypcje (Netflix, Spotify, YouTube Premium, aplikacje, iCloud)
+    4 - Bank (opłaty za prowadzenie konta, prowizje, odsetki)
+    5 - Kosmetyki (Rossmann, Hebe, Sephora, drogerie, kosmetyczka, fryzjer)
+    6 - Transport (paliwo, bilety komunikacji miejskiej, Uber, Bolt, PKP, taksówki, parkingi)
+    7 - Rachunki (czynsz, prąd, gaz, internet, telefon)
+    8 - Leki (apteki, lekarze, badania, medycyna)
+    9 - Mieszkanie (meble, wyposażenie wnętrz, remont, IKEA, Castorama)
+    10 - Ubrania (odzież, obuwie, sklepy sieciowe z ubraniami)
+    11 - Rozrywka/Wyjazdy (kino, teatr, hotele, loty, wakacje, imprezy)
+    12 - Inne (wydatki, które nie pasują do żadnej z powyższych kategorii ORAZ ogólne przelewy przychodzące)
+
+    Zwróć wyłącznie sam surowy JSON, bez żadnego formatowania markdown (bez ```json), bez wstępów i podsumowań.
     
     Dodatkowe uwagi:
-    JOYFUL - kategoria 'jedzenie' - 1
+    - JOYFUL kategoryzuj jako numer 1 - jedzenie
+
+    Przykład struktury odpowiedzi:
+    {{"transakcje": [{{"kwota": 46.33, "sklep": "Kaufland", "kategoria_id": 1, "typ": "WYDATEK"}}]}}
     """
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0,  # Zero kreatywności, zależy nam na sztywnych danych
+            response_format={"type": "json_object"}
         )
 
-        # Odpowiedź od AI zamieniamy bezpośrednio na słownik Pythona
-        wynik_json = json.loads(response.choices[0].message.content.strip())
+        # Pobieramy czysty tekst z odpowiedzi AI
+        # ... (tutaj jest początek Twojego kodu z chat_completion) ...
 
-        # Zamieniamy klucze na liczby całkowite dla łatwiejszego dopasowania
-        return {int(k): int(v) for k, v in wynik_json.items()}
+        # Pobieramy tekst
+        odpowiedz_tekst = chat_completion.choices[0].message.content.strip()
+
+        # 🔥 TA LINIA POKAŻE NAM PRAWDĘ W KONSOLI:
+        print(f"🔎 DEBUG: Model AI przesłał dokładnie taki tekst:\n{odpowiedz_tekst}\n-------------------")
+
+        # Dodatkowy ratunek: gdyby model mimo wszystko wbił tam znaczniki markdownu
+        if odpowiedz_tekst.startswith("```"):
+            odpowiedz_tekst = odpowiedz_tekst.split("```")[1]
+            if odpowiedz_tekst.startswith("json"):
+                odpowiedz_tekst = odpowiedz_tekst[4:]
+        odpowiedz_tekst = odpowiedz_tekst.strip()
+
+        # Parsujemy tekst na słownik Pythona
+        dane_transakcji = json.loads(odpowiedz_tekst)
+        return dane_transakcji
 
     except Exception as e:
-        print(f"❌ Błąd zbiorczego AI: {e}")
-        return {}
+        print(f"❌ Błąd komunikacji z Groq AI lub parsowania JSON: {e}")
+        if 'odpowiedz_tekst' in locals():
+            print(f"⚠️ Surowa odpowiedź modelu to:\n{odpowiedz_tekst}")
+        return None
