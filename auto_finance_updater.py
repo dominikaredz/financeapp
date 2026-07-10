@@ -3,6 +3,7 @@ import sqlite3
 import json
 import warnings
 from dotenv import load_dotenv
+from ai_categorized import rozpoznaj_kategorie_zbiorczo
 
 # Uciszamy ostrzeżenia o datach w nowym Pythonie
 warnings.filterwarnings("ignore", category=DeprecationWarning)
