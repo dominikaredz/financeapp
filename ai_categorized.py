@@ -1,15 +1,9 @@
 import os
 import json
 from groq import Groq
-from dotenv import load_dotenv
 
-# --- ŁADOWANIE KONFIGURACJI ---
-folder_projektu = r'E:\Programowanie\FinanceApp'
-load_dotenv(dotenv_path=os.path.join(folder_projektu, '.env'))
-
-# Inicjalizacja klienta Groq
+# Tworzymy klienta Groq - teraz bez błędu, bo app_server zdążył już załadować env.txt!
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
 
 def analizuj_powiadomienie_przez_ai(tresc_pusha):
     """
@@ -45,7 +39,7 @@ def analizuj_powiadomienie_przez_ai(tresc_pusha):
     12 - Inne (wydatki, które nie pasują do żadnej z powyższych kategorii ORAZ ogólne przelewy przychodzące)
 
     Zwróć wyłącznie sam surowy JSON, bez żadnego formatowania markdown (bez ```json), bez wstępów i podsumowań.
-    
+
     Dodatkowe uwagi:
     - JOYFUL kategoryzuj jako numer 1 - jedzenie
 
@@ -67,13 +61,11 @@ def analizuj_powiadomienie_przez_ai(tresc_pusha):
         )
 
         # Pobieramy czysty tekst z odpowiedzi AI
-        # ... (tutaj jest początek Twojego kodu z chat_completion) ...
-
-        # Pobieramy tekst
         odpowiedz_tekst = chat_completion.choices[0].message.content.strip()
 
-        # 🔥 TA LINIA POKAŻE NAM PRAWDĘ W KONSOLI:
-        print(f"🔎 DEBUG: Model AI przesłał dokładnie taki tekst:\n{odpowiedz_tekst}\n-------------------")
+        # 🔥 Pokaże nam prawdę w pliku logów:
+        import logging
+        logging.info(f"🔎 DEBUG: Model AI przesłał dokładnie taki tekst:\n{odpowiedz_tekst}\n-------------------")
 
         # Dodatkowy ratunek: gdyby model mimo wszystko wbił tam znaczniki markdownu
         if odpowiedz_tekst.startswith("```"):
@@ -87,7 +79,8 @@ def analizuj_powiadomienie_przez_ai(tresc_pusha):
         return dane_transakcji
 
     except Exception as e:
-        print(f"❌ Błąd komunikacji z Groq AI lub parsowania JSON: {e}")
+        import logging
+        logging.error(f"❌ Błąd komunikacji z Groq AI lub parsowania JSON: {e}")
         if 'odpowiedz_tekst' in locals():
-            print(f"⚠️ Surowa odpowiedź modelu to:\n{odpowiedz_tekst}")
+            logging.warning(f"⚠️ Surowa odpowiedź modelu to:\n{odpowiedz_tekst}")
         return None

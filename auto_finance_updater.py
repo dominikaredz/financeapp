@@ -62,9 +62,11 @@ def zapisz_lub_scal_transakcje(kategoria_id, kwota, data, opis, typ, zrodlo):
                 query_update = "UPDATE transakcje SET opis_sklepu = ?, zrodlo = 'GOOGLE_SCALONE' WHERE id = ?;"
                 cursor.execute(query_update, (opis, t_id))
                 conn.commit()
-                logging.info(f"🔄 Scalono duplikaty! Zastąpiono suchy wpis z banku ładną nazwą z Google: {opis} ({kwota} PLN)")
+                logging.info(
+                    f"🔄 Scalono duplikaty! Zastąpiono suchy wpis z banku ładną nazwą z Google: {opis} ({kwota} PLN)")
             else:
-                logging.warning(f"⚠️ Wykryto duplikat z {zrodlo} dla kwoty {kwota} PLN. Ignoruję (mamy już lepsze dane).")
+                logging.warning(
+                    f"⚠️ Wykryto duplikat z {zrodlo} dla kwoty {kwota} PLN. Ignoruję (mamy już lepsze dane).")
 
         else:
             # Brak duplikatów – wpisujemy jako nową transakcję
@@ -94,6 +96,75 @@ def cenzuruj_wrazliwe_dane(tekst_paczy):
 # --- PROCESOR PACZEK ---
 def przetworz_powiadomienie_push(tresc_pusha):
     logging.info("📱 Rozpoczynam przetwarzanie paczki powiadomień...")
-    dzisiejsza_data = datetime.now().strftime("%Y-%m-%d")
 
-    # --- 1. AUTOMATYCZNE FILTROWANIE SUROWYCH
+    try:  # --- PEŁNY BLOK OCHRONNY ---
+        dzisiejsza_data = datetime.now().strftime("%Y-%m-%d")
+
+        # --- 1. AUTOMATYCZNE FILTROWANIE SUROWYCH PRZELEWÓW MILLENNIUM ---
+        if "MILLENNIUM" in tresc_pusha.upper() and "PRZELEW" in tresc_pusha.upper():
+            logging.info("ℹ️ System: Wykryto surowy przelew z Millennium. Przetwarzam automatycznie (bez AI)...")
+
+            # Wyciągamy kwotę z tekstu powiadomienia
+            kwota_match = re.search(r"Kwota:\s*([0-9.,]+)", tresc_pusha)
+            if not kwota_match:
+                logging.error("⚠️ Nie udało się wyciągnąć kwoty z powiadomienia Millennium. Przerywam.")
+                return
+
+            kwota = float(kwota_match.group(1).replace(',', '.'))
+
+            # Ustalamy kierunek, opis i nową kategorię
+            if "PRZYCHODZĄCY" in tresc_pusha.upper():
+                typ_transakcji = "PRZYCHOD"
+                kategoria_id = 13  # Kategoria 'Przychody' z bazy
+                sklep = "Przelew Przychodzący Millennium"
+            else:
+                typ_transakcji = "WYDATEK"
+                kategoria_id = 12  # Kategoria 'Inne'
+                sklep = "Przelew Wychodzący Millennium"
+
+            zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, "MILLENNIUM")
+            return  # Kończymy przetwarzanie sukcesem
+
+        # --- 2. STANDARDOWA ŚCIEŻKA DLA INNYCH POWIADOMIEŃ (NP. PORTFEL GOOGLE) ---
+        bezpieczna_tresc_dla_ai = cenzuruj_wrazliwe_dane(tresc_pusha)
+
+        logging.info("🚀 Przekazuję bezpieczną paczkę do AI...")
+        dane_z_ai = analizuj_powiadomienie_przez_ai(bezpieczna_tresc_dla_ai)
+
+        if dane_z_ai and isinstance(dane_z_ai, dict) and "transakcje" in dane_z_ai:
+            lista_transakcji = dane_z_ai["transakcje"]
+            linie = tresc_pusha.strip().split('\n')
+
+            for transakcja in lista_transakcji:
+                kwota = transakcja.get("kwota")
+                sklep = transakcja.get("sklep")
+                kategoria_id = transakcja.get("kategoria_id", 12)
+                typ_transakcji = transakcja.get("typ", "WYDATEK")
+
+                # --- SUPERELASTYCZNA DETEKCJA ŹRÓDŁA ---
+                zrodlo = "NIEZNANE"
+                for linia in linie:
+                    if str(kwota).replace('.', ',') in linia or str(kwota) in linia:
+                        if "MILLENNIUM" in linia.upper():
+                            zrodlo = "MILLENNIUM"
+                            break
+                        elif "PORTFEL" in linia.upper() or "GOOGLE" in linia.upper():
+                            zrodlo = "GOOGLE"
+                            break
+
+                if kwota is not None and sklep:
+                    zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, zrodlo)
+        else:
+            logging.error("❌ Nie udało się sparsować paczki wiadomości przez AI.")
+
+    except Exception as e:
+        # Ten fragment złapie KAŻDY błąd i precyzyjnie opisze go w logu
+        logging.exception(f"💥 Krytyczny błąd wewnątrz procesora pushy: {e}")
+
+
+if __name__ == "__main__":
+    sciezka_pusha = os.path.join(folder_projektu, 'test_push_notification.txt')
+    if os.path.exists(sciezka_pusha):
+        with open(sciezka_pusha, 'r', encoding='utf-8') as f:
+            surowy_push = f.read().strip()
+        przetworz_powiadomienie_push(surowy_push)
