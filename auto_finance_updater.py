@@ -3,19 +3,34 @@ import sqlite3
 import json
 import warnings
 import re
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
 from ai_categorized import analizuj_powiadomienie_przez_ai
 
+# --- KONFIGURACJA ŚCIEŻEK ---
+folder_projektu = r'/home/domiredz00/FinanceApp'
+
+# --- KONFIGURACJA LOGOWANIA ---
+log_file_path = os.path.join(folder_projektu, 'finance_app.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.FileHandler(log_file_path, encoding='utf-8'),
+        logging.StreamHandler()  # Logi będą widoczne jednocześnie w pliku i konsoli serwera
+    ]
+)
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# --- KONFIGURACJA ---
-folder_projektu = r'E:\Programowanie\FinanceApp'
-load_dotenv(dotenv_path=os.path.join(folder_projektu, '.env'))
+# --- KONFIGURACJA BAZY I DOTENV ---
+load_dotenv(dotenv_path=os.path.join(folder_projektu, 'env.txt'))
 path_to_db = os.path.join(folder_projektu, 'finance_db.sqlite')
 
 try:
-    with open('config.json', 'r', encoding='utf-8') as f:
+    with open(os.path.join(folder_projektu, 'config.json'), 'r', encoding='utf-8') as f:
         config = json.load(f)
         prywatne_slowa = config["blokowane_slowa"]
 except FileNotFoundError:
@@ -28,7 +43,7 @@ def zapisz_lub_scal_transakcje(kategoria_id, kwota, data, opis, typ, zrodlo):
         conn = sqlite3.connect(path_to_db)
         cursor = conn.cursor()
 
-        # 1. Szukamy transakcji o tej samej kwocie z dzisiaj (inteligentne okno duplikatów)
+        # Szukamy transakcji o tej samej kwocie z dzisiaj
         query_check = """
                       SELECT id, opis_sklepu, zrodlo \
                       FROM transakcje
@@ -42,14 +57,14 @@ def zapisz_lub_scal_transakcje(kategoria_id, kwota, data, opis, typ, zrodlo):
         if istniejaca_transakcja:
             t_id, stary_opis, stare_zrodlo = istniejaca_transakcja
 
-            # Jeśli stare to Millennium, a nowe to Google -> Google ma lepszą nazwę, aktualizujemy!
+            # Jeśli stare to Millennium, a nowe to Google -> Aktualizujemy nazwę
             if stare_zrodlo == "MILLENNIUM" and zrodlo == "GOOGLE":
                 query_update = "UPDATE transakcje SET opis_sklepu = ?, zrodlo = 'GOOGLE_SCALONE' WHERE id = ?;"
                 cursor.execute(query_update, (opis, t_id))
                 conn.commit()
-                print(f"🔄 Scalono duplikaty! Zastąpiono suchy wpis z banku ładną nazwą z Google: {opis} ({kwota} PLN)")
+                logging.info(f"🔄 Scalono duplikaty! Zastąpiono suchy wpis z banku ładną nazwą z Google: {opis} ({kwota} PLN)")
             else:
-                print(f"⚠️ Wykryto duplikat z {zrodlo} dla kwoty {kwota} PLN. Ignoruję (mamy już lepsze dane).")
+                logging.warning(f"⚠️ Wykryto duplikat z {zrodlo} dla kwoty {kwota} PLN. Ignoruję (mamy już lepsze dane).")
 
         else:
             # Brak duplikatów – wpisujemy jako nową transakcję
@@ -59,11 +74,11 @@ def zapisz_lub_scal_transakcje(kategoria_id, kwota, data, opis, typ, zrodlo):
                            """
             cursor.execute(query_insert, (kategoria_id, kwota, data, opis, typ, zrodlo))
             conn.commit()
-            print(f"💾 Nowy wpis ({zrodlo}): {opis} | {kwota} PLN | Kategoria ID: {kategoria_id}")
+            logging.info(f"💾 Nowy wpis ({zrodlo}): {opis} | {kwota} PLN | Kategoria ID: {kategoria_id}")
 
         conn.close()
     except sqlite3.Error as e:
-        print(f"❌ Błąd bazy danych: {e}")
+        logging.error(f"❌ Błąd bazy danych: {e}")
 
 
 # --- CENZOR ---
@@ -78,75 +93,7 @@ def cenzuruj_wrazliwe_dane(tekst_paczy):
 
 # --- PROCESOR PACZEK ---
 def przetworz_powiadomienie_push(tresc_pusha):
-    print(f"\n📱 Rozpoczynam przetwarzanie paczki powiadomień...")
+    logging.info("📱 Rozpoczynam przetwarzanie paczki powiadomień...")
     dzisiejsza_data = datetime.now().strftime("%Y-%m-%d")
 
-    # --- NOWOŚĆ: AUTOMATYCZNE FILTROWANIE SUROWYCH PRZELEWÓW MILLENNIUM ---
-    if "MILLENNIUM" in tresc_pusha.upper() and "PRZELEW" in tresc_pusha.upper():
-        print("ℹ️ System: Wykryto surowy przelew z Millennium. Przetwarzam automatycznie (bez AI)...")
-
-        # Wyciągamy kwotę z tekstu powiadomienia
-        kwota_match = re.search(r"Kwota:\s*([0-9.,]+)", tresc_pusha)
-        if not kwota_match:
-            print("⚠️ Nie udało się wyciągnąć kwoty z powiadomienia Millennium. Przerywam.")
-            return
-
-        kwota = float(kwota_match.group(1).replace(',', '.'))
-
-        # Ustalamy kierunek, opis i nową kategorię
-        if "PRZYCHODZĄCY" in tresc_pusha.upper():
-            typ_transakcji = "PRZYCHOD"
-            kategoria_id = 13  # Twoja nowa kategoria 'Przychody' z DataGripa
-            sklep = "Przelew Przychodzący Millennium"
-        else:
-            typ_transakcji = "WYDATEK"
-            kategoria_id = 12  # Kategoria 'Inne'
-            sklep = "Przelew Wychodzący Millennium"
-
-        # Wywołujemy Twoją standardową funkcję zapisu (ona sama sprawdzi duplikaty)
-        zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, "MILLENNIUM")
-        return  # Wychodzimy z funkcji! Nie idziemy do AI.
-
-    # --- STANDARDOWA ŚCIEŻKA DLA INNYCH POWIADOMIEŃ (NP. PORTFEL GOOGLE) ---
-    # Lokalna cenzura
-    bezpieczna_tresc_dla_ai = cenzuruj_wrazliwe_dane(tresc_pusha)
-
-    # Wysyłanie do AI Groq
-    print("🚀 Przekazuję bezpieczną paczkę do AI...")
-    dane_z_ai = analizuj_powiadomienie_przez_ai(bezpieczna_tresc_dla_ai)
-
-    if dane_z_ai and isinstance(dane_z_ai, dict) and "transakcje" in dane_z_ai:
-        lista_transakcji = dane_z_ai["transakcje"]
-
-        # Potrzebujemy też oryginalnych linii, żeby wykryć źródło (Google/Millennium)
-        linie = tresc_pusha.strip().split('\n')
-
-        for transakcja in lista_transakcji:
-            kwota = transakcja.get("kwota")
-            sklep = transakcja.get("sklep")
-            kategoria_id = transakcja.get("kategoria_id", 12)
-            typ_transakcji = transakcja.get("typ", "WYDATEK")
-
-            # --- SUPERELASTYCZNA DETEKCJA ŹRÓDŁA ---
-            zrodlo = "NIEZNANE"
-            for linia in linie:
-                if str(kwota).replace('.', ',') in linia or str(kwota) in linia:
-                    if "MILLENNIUM" in linia.upper():
-                        zrodlo = "MILLENNIUM"
-                        break
-                    elif "PORTFEL" in linia.upper() or "GOOGLE" in linia.upper():
-                        zrodlo = "GOOGLE"
-                        break
-
-            if kwota is not None and sklep:
-                zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, zrodlo)
-    else:
-        print("❌ Nie udało się sparsować paczki wiadomości przez AI.")
-
-
-if __name__ == "__main__":
-    sciezka_pusha = os.path.join(folder_projektu, 'test_push_notification.txt')
-    if os.path.exists(sciezka_pusha):
-        with open(sciezka_pusha, 'r', encoding='utf-8') as f:
-            surowy_push = f.read().strip()
-        przetworz_powiadomienie_push(surowy_push)
+    # --- 1. AUTOMATYCZNE FILTROWANIE SUROWYCH
