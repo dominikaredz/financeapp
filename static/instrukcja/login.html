@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie - Budget Planner AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-wrapper container">
+        <div class="pastel-card auth-card mx-auto">
+            <div class="auth-logo">
+                <span class="text-muted text-uppercase small">🗓️ Budget Planner AI</span>
+                <h3 class="fw-bold mt-1" style="color: #615d57;">Zaloguj się</h3>
+            </div>
+
+            {% if blad %}
+            <div class="alert-pastel">{{ blad }}</div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('zaloguj') }}">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">E-mail</label>
+                    <input type="email" name="email" class="form-control form-control-pastel" required autofocus>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small text-muted">Hasło</label>
+                    <input type="password" name="haslo" class="form-control form-control-pastel" required>
+                </div>
+                <button type="submit" class="btn btn-pastel btn-pastel-primary w-100">Zaloguj się</button>
+            </form>
+
+            <div class="auth-link">
+                Nie masz jeszcze konta? <a href="{{ url_for('zarejestruj') }}">Zarejestruj się</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

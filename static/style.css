@@ -1,0 +1,264 @@
+/* Pastelowa paleta kolorów - wspólna dla całej aplikacji */
+:root {
+    --bg-pastel: #faf7f2;
+    --income-green: #d1e2d3;
+    --expense-pink: #f2d1cb;
+    --budget-beige: #fcefd2;
+    --text-dark: #4a4743;
+    --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+    --accent: #a8c3ab;
+    --accent-dark: #7ea183;
+}
+
+body {
+    background-color: var(--bg-pastel);
+    color: var(--text-dark);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* --- Kafelki --- */
+.pastel-card {
+    background-color: #ffffff;
+    border: none;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.card-header-custom {
+    border-radius: 12px;
+    padding: 10px 15px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bg-income { background-color: var(--income-green); color: #3d5241; }
+.bg-expense { background-color: var(--expense-pink); color: #69433c; }
+.bg-overview { background-color: var(--budget-beige); color: #594726; }
+.bg-tools { background-color: #e3dce8; color: #4d3f5c; }
+
+/* --- Tabela --- */
+.table { color: var(--text-dark); }
+.table th {
+    border: none;
+    background-color: #fcfbfa;
+    font-weight: 500;
+    color: #8c8882;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+.table td {
+    border-bottom: 1px solid #f5f2eb;
+    padding: 12px 8px;
+    vertical-align: middle;
+}
+
+/* --- Mini statusy --- */
+.badge-type {
+    border-radius: 30px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+}
+.badge-WYDATEK { background-color: #fce8e6; color: #a83232; }
+.badge-PRZYCHOD { background-color: #e6f4ea; color: #137333; }
+
+/* --- Wykres --- */
+.chart-container {
+    position: relative;
+    max-width: 280px;
+    margin: 0 auto;
+}
+
+/* --- Górny pasek (imię użytkownika + wyloguj) --- */
+.pasek-uzytkownika {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.pasek-uzytkownika .imie-uzytkownika {
+    font-weight: 600;
+    color: #615d57;
+}
+
+/* --- Przyciski w stylu pastelowym --- */
+.btn-pastel {
+    border-radius: 30px;
+    padding: 8px 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: none;
+    white-space: nowrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-pastel:hover { transform: translateY(-1px); }
+
+.btn-pastel-primary { background-color: var(--accent); color: #fff; }
+.btn-pastel-primary:hover { background-color: var(--accent-dark); color: #fff; }
+
+.btn-pastel-outline {
+    background-color: #fff;
+    color: var(--text-dark);
+    border: 1px solid #e5e0d8;
+}
+.btn-pastel-outline:hover { background-color: #f5f2eb; color: var(--text-dark); }
+.btn-pastel-outline.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: default;
+}
+
+.btn-icon-edit {
+    border: none;
+    background: #f5f2eb;
+    color: #8c8882;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: background-color 0.15s ease;
+}
+.btn-icon-edit:hover { background: var(--budget-beige); color: #594726; }
+
+/* --- Formularze (logowanie/rejestracja/edycja) --- */
+.form-control-pastel {
+    border-radius: 12px;
+    border: 1px solid #e5e0d8;
+    padding: 10px 14px;
+    background-color: #fcfbfa;
+}
+.form-control-pastel:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.2rem rgba(168, 195, 171, 0.25);
+    background-color: #fff;
+}
+
+/* --- Strona logowania / rejestracji --- */
+.auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.auth-card {
+    max-width: 420px;
+    width: 100%;
+}
+.auth-logo {
+    text-align: center;
+    margin-bottom: 24px;
+}
+.auth-link {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: #8c8882;
+}
+.auth-link a { color: var(--accent-dark); font-weight: 600; text-decoration: none; }
+.auth-link a:hover { text-decoration: underline; }
+
+.alert-pastel {
+    border-radius: 12px;
+    border: none;
+    background-color: var(--expense-pink);
+    color: #69433c;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+
+/* --- Karta importu CSV --- */
+.upload-dropzone {
+    border: 2px dashed #e5e0d8;
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+    color: #8c8882;
+    font-size: 0.85rem;
+}
+
+/* --- Tabela transakcji - sztywne szerokości kolumn (colgroup w HTML) --- */
+/* KRYTYCZNE: bez table-layout:fixed przeglądarka liczy szerokość kolumn na
+   podstawie NAJSZERSZEJ zawartości w CAŁEJ tabeli, łącznie z rozwiniętym
+   wierszem pozycji paragonu (może mieć kilkanaście chipów w jednej linii).
+   To powodowało, że rozwinięcie paragonu "rozjeżdżało" całą resztę tabeli. */
+.table-transakcje {
+    table-layout: fixed;
+    width: 100%;
+    /* KRYTYCZNE dla telefonów: bez min-width tabela była WYMUSZANA do zmieszczenia
+       się dokładnie w szerokości ekranu (nawet 350px), więc 10% kolumny = ~35px -
+       stąd data i źródło łamały się litera po literze. Z min-width tabela "wystaje"
+       poza ekran na wąskich urządzeniach, a .table-responsive daje wtedy poziomy
+       scroll - normalne, czytelne kolumny zamiast ścisku. */
+    min-width: 640px;
+}
+.table-transakcje td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* --- Pasek filtrów nad tabelą --- */
+.filtr-pole {
+    min-width: 130px;
+}
+/* Przycisk "Szukaj" wypełnia 100% wysokości swojej kolumny (a kolumnę Bootstrap
+   domyślnie "stretch'uje" do wysokości najwyższego elementu w wierszu) - to
+   gwarantuje identyczną wysokość z polami obok, niezależnie od różnic w
+   czcionce/obramowaniu, zamiast zgadywać dokładny padding w pikselach. */
+.filtr-przycisk {
+    height: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- Kod/link webhooka --- */
+.webhook-box {
+    background-color: #fcfbfa;
+    border: 1px solid #f5f2eb;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+    color: #615d57;
+}
+
+.badge-rozwijalny {
+    cursor: pointer;
+    user-select: none;
+}
+.badge-rozwijalny:hover {
+    filter: brightness(0.95);
+}
+
+/* --- Pozycje rozbitego paragonu --- */
+.pozycje-paragonu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.pozycja-chip {
+    background-color: #fcfbfa;
+    border: 1px solid #f5f2eb;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: #8c8882;
+}

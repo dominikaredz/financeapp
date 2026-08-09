@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instrukcja Macrodroid - Budget Planner AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-4">
+
+        <div class="pasek-uzytkownika">
+            <a href="{{ url_for('strona_glowna') }}" class="btn btn-pastel btn-pastel-outline btn-sm">← Wróć do panelu</a>
+        </div>
+
+        <div class="row mb-4 text-center">
+            <div class="col">
+                <span class="text-muted text-uppercase small">📱 Konfiguracja telefonu</span>
+                <h2 class="fw-bold mt-1" style="color: #615d57;">Podłączanie Macrodroid</h2>
+            </div>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-tools">
+                        <span>Zanim zaczniesz</span>
+                        <span>🔑</span>
+                    </div>
+                    <p class="mb-2">
+                        Będziesz potrzebować swojego <strong>osobistego linku powiadomień</strong> ze strony
+                        głównej (sekcja "Twój link powiadomień push"). Skopiuj go - wkleisz go w kroku 1 poniżej.
+                    </p>
+                    <p class="mb-0 text-muted small">
+                        Ta jedna reguła obsłuży <strong>dowolną appkę bankową czy portfel</strong> (Millennium, mBank,
+                        ING, Portfel Google, cokolwiek) - nie musisz tworzyć osobnej reguły dla każdego banku.
+                    </p>
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-overview">
+                        <span>Krok 1 - Trigger (wyzwalacz)</span>
+                        <span>1️⃣</span>
+                    </div>
+                    <p>
+                        W Macrodroid utwórz nowe makro. Jako <strong>Trigger</strong> wybierz
+                        <strong>"Notification Received"</strong> (Otrzymano powiadomienie). W polu aplikacji
+                        zaznacz appki, z których chcesz zbierać transakcje (appka banku, Portfel Google, itd.) -
+                        możesz zaznaczyć kilka naraz.
+                    </p>
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-overview">
+                        <span>Krok 2 - Akcja: Żądanie HTTP (Ustawienia)</span>
+                        <span>2️⃣</span>
+                    </div>
+                    <p>Jako akcję dodaj <strong>"Żądanie HTTP"</strong>. Na zakładce <strong>Ustawienia</strong>:</p>
+                    <ul>
+                        <li>Metoda żądania: <strong>POST</strong></li>
+                        <li>URL: Twój link powiadomień push (ten z kroku "Zanim zaczniesz") - wygląda jak
+                            <code>https://domiredz00.pythonanywhere.com/webhook/push?token=TWOJ_TOKEN</code></li>
+                        <li>Zaznacz <strong>"Zezwól na dowolny certyfikat"</strong> i <strong>"Śledź przekierowania"</strong></li>
+                        <li>Limit czasu: <strong>30</strong>, Maksymalny całkowity czas trwania: <strong>3600</strong></li>
+                    </ul>
+                    <img src="{{ url_for('static', filename='instrukcja/macrodroid_1_ustawienia.jpg') }}"
+                         class="img-fluid rounded-4 mt-2" alt="Ustawienia żądania HTTP w Macrodroid">
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-overview">
+                        <span>Krok 3 - Parametry zapytań</span>
+                        <span>3️⃣</span>
+                    </div>
+                    <p>Przejdź na zakładkę <strong>"Parametry zapytań"</strong> i dodaj trzy pozycje (przycisk <strong>+</strong> w prawym dolnym rogu):</p>
+                    <ul>
+                        <li><code>app_id</code> → <code>{not_app_package}</code></li>
+                        <li><code>app_name</code> → <code>{not_app_name}</code></li>
+                        <li><code>text</code> → <code>{not_title} - {notification}</code></li>
+                    </ul>
+                    <p class="text-muted small">
+                        Dokładne nazwy zmiennych (w nawiasach klamrowych) wstawisz z listy zmiennych dostępnej
+                        po kliknięciu w pole tekstowe - szukaj tych związanych z powiadomieniem
+                        ("notification title", "notification text", "app package").
+                    </p>
+                    <img src="{{ url_for('static', filename='instrukcja/macrodroid_2_parametry.jpg') }}"
+                         class="img-fluid rounded-4 mt-2" alt="Parametry zapytań w Macrodroid">
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-overview">
+                        <span>Krok 4 - Treść treści</span>
+                        <span>4️⃣</span>
+                    </div>
+                    <p>
+                        Zakładkę <strong>"Treść treści"</strong> zostaw bez zmian (pustą) - wszystkie dane
+                        przekazujemy przez parametry zapytań z kroku 3, więc treść żądania nie jest używana.
+                    </p>
+                    <img src="{{ url_for('static', filename='instrukcja/macrodroid_3_tresc.jpg') }}"
+                         class="img-fluid rounded-4 mt-2" alt="Treść treści w Macrodroid">
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-income">
+                        <span>Gotowe!</span>
+                        <span>✅</span>
+                    </div>
+                    <p class="mb-0">
+                        Zapisz makro i wykonaj testową płatność (albo poczekaj na prawdziwe powiadomienie).
+                        Nowa transakcja powinna pojawić się na Twoim panelu w ciągu kilku sekund. Jeśli nic się
+                        nie pojawi, sprawdź czy skopiowałeś/aś cały link razem z tokenem w kroku 2.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

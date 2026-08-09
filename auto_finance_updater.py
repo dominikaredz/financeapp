@@ -6,10 +6,17 @@ import re
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from ai_categorized import analizuj_powiadomienie_przez_ai
 
-# --- KONFIGURACJA ŚCIEŻEK ---
+# --- KONFIGURACJA ŚCIEŻEK I DOTENV ---
+# WAŻNE: to musi być wykonane PRZED importem ai_categorized, bo ten moduł
+# tworzy klienta Groq już na poziomie importu (client = Groq(api_key=os.getenv(...))).
+# Jeśli GROQ_API_KEY nie jest jeszcze wczytany z env.txt, import ai_categorized
+# rzuci groq.GroqError.
 folder_projektu = r'/home/domiredz00/FinanceApp'
+load_dotenv(dotenv_path=r'/home/domiredz00/.env')
+path_to_db = os.path.join(folder_projektu, 'finance_db.sqlite')
+
+from ai_categorized import analizuj_powiadomienie_przez_ai
 
 # --- KONFIGURACJA LOGOWANIA ---
 log_file_path = os.path.join(folder_projektu, 'finance_app.log')
@@ -25,10 +32,6 @@ logging.basicConfig(
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# --- KONFIGURACJA BAZY I DOTENV ---
-load_dotenv(dotenv_path=os.path.join(folder_projektu, 'env.txt'))
-path_to_db = os.path.join(folder_projektu, 'finance_db.sqlite')
-
 try:
     with open(os.path.join(folder_projektu, 'config.json'), 'r', encoding='utf-8') as f:
         config = json.load(f)
@@ -38,50 +41,60 @@ except FileNotFoundError:
 
 
 # --- FUNKCJA INTEGRACJI BAZY DANYCH (Z DUPLIKATAMI) ---
-def zapisz_lub_scal_transakcje(kategoria_id, kwota, data, opis, typ, zrodlo):
+# ZMIANA: Dodajemy argument uzytkownik_id na początku funkcji
+def zapisz_lub_scal_transakcje(uzytkownik_id, kategoria_id, kwota, data, opis, typ, zrodlo):
     try:
+        if kwota is not None:
+            kwota = abs(float(str(kwota).replace(',', '.')))
+
         conn = sqlite3.connect(path_to_db)
         cursor = conn.cursor()
 
-        # Szukamy transakcji o tej samej kwocie z dzisiaj
+        # Szukamy transakcji o tej samej kwocie z dzisiaj DLA TEGO KONKRETNEGO UŻYTKOWNIKA
         query_check = """
-                      SELECT id, opis_sklepu, zrodlo \
+                      SELECT id, opis_sklepu, zrodlo
                       FROM transakcje
-                      WHERE kwota = ? \
-                        AND data = ? \
-                        AND typ = ?; \
+                      WHERE kwota = ?
+                        AND data = ?
+                        AND typ = ?
+                        AND uzytkownik_id = ?;
                       """
-        cursor.execute(query_check, (kwota, data, typ))
+        cursor.execute(query_check, (kwota, data, typ, uzytkownik_id))
         istniejaca_transakcja = cursor.fetchone()
 
         if istniejaca_transakcja:
             t_id, stary_opis, stare_zrodlo = istniejaca_transakcja
 
-            # Jeśli stare to Millennium, a nowe to Google -> Aktualizujemy nazwę
-            if stare_zrodlo == "MILLENNIUM" and zrodlo == "GOOGLE":
-                query_update = "UPDATE transakcje SET opis_sklepu = ?, zrodlo = 'GOOGLE_SCALONE' WHERE id = ?;"
-                cursor.execute(query_update, (opis, t_id))
-                conn.commit()
-                logging.info(
-                    f"🔄 Scalono duplikaty! Zastąpiono suchy wpis z banku ładną nazwą z Google: {opis} ({kwota} PLN)")
-            else:
-                logging.warning(
-                    f"⚠️ Wykryto duplikat z {zrodlo} dla kwoty {kwota} PLN. Ignoruję (mamy już lepsze dane).")
+            # UNIWERSALNE scalanie: zamiast sprawdzać KONKRETNE nazwy banków/appek
+            # (co wymagałoby dopisywania każdego nowego banku ręcznie), patrzymy na
+            # JAKOŚĆ opisu. Jeśli istniejący wpis ma generyczną nazwę ("Płatność",
+            # "BLIK", "Przelew" - czyli appka bankowa nie znała sprzedawcy), a nowe
+            # powiadomienie przynosi konkretną nazwę (np. z portfela Google/Apple,
+            # który zna sprzedawcę) - nadpisujemy ładniejszą wersją. Działa identycznie
+            # dla dowolnej kombinacji: Millennium+Google, mBank+Apple Pay, cokolwiek.
+            czy_stary_generyczny = stary_opis.strip().lower() in OPISY_GENERYCZNE
+            czy_nowy_konkretny = opis.strip().lower() not in OPISY_GENERYCZNE
 
+            if czy_stary_generyczny and czy_nowy_konkretny:
+                query_update = "UPDATE transakcje SET opis_sklepu = ?, kategoria_id = ?, zrodlo = ? WHERE id = ?;"
+                cursor.execute(query_update, (opis, kategoria_id, f"{zrodlo}_SCALONE", t_id))
+                conn.commit()
+                logging.info(f"🔄 Scalono duplikaty dla user_id {uzytkownik_id}: '{stary_opis}' -> '{opis}'")
+            else:
+                logging.warning(f"⚠️ Wykryto duplikat ('{opis}' vs istniejące '{stary_opis}'). Ignoruję.")
         else:
-            # Brak duplikatów – wpisujemy jako nową transakcję
+            # ZMIANA: Przekazujemy dynamiczne uzytkownik_id zamiast sztywnej jedynki
             query_insert = """
                            INSERT INTO transakcje (uzytkownik_id, kategoria_id, kwota, data, opis_sklepu, typ, zrodlo)
-                           VALUES (1, ?, ?, ?, ?, ?, ?); \
+                           VALUES (?, ?, ?, ?, ?, ?, ?);
                            """
-            cursor.execute(query_insert, (kategoria_id, kwota, data, opis, typ, zrodlo))
+            cursor.execute(query_insert, (uzytkownik_id, kategoria_id, kwota, data, opis, typ, zrodlo))
             conn.commit()
-            logging.info(f"💾 Nowy wpis ({zrodlo}): {opis} | {kwota} PLN | Kategoria ID: {kategoria_id}")
+            logging.info(f"💾 Nowy wpis (User {uzytkownik_id}): {opis} | {kwota} PLN")
 
         conn.close()
     except sqlite3.Error as e:
         logging.error(f"❌ Błąd bazy danych: {e}")
-
 
 # --- CENZOR ---
 def cenzuruj_wrazliwe_dane(tekst_paczy):
@@ -93,47 +106,39 @@ def cenzuruj_wrazliwe_dane(tekst_paczy):
     return tekst_oczyszczony
 
 
-# --- PROCESOR PACZEK ---
-def przetworz_powiadomienie_push(tresc_pusha):
-    logging.info("📱 Rozpoczynam przetwarzanie paczki powiadomień...")
+# Opisy uznawane za "generyczne" (appka nie znała nazwy sprzedawcy) - używane przy
+# scalaniu duplikatów (patrz zapisz_lub_scal_transakcje) do decyzji, czy nowsze
+# powiadomienie ma konkretniejszą nazwę, którą warto nadpisać starą.
+OPISY_GENERYCZNE = {"płatność", "przelew", "blik", "wydatek", "przychód", "nieznany", "nieznana", "transakcja"}
 
-    try:  # --- PEŁNY BLOK OCHRONNY ---
+# Uniwersalny wzorzec kwoty - pasuje do dowolnego zapisu typu "19,18", "-13.00", "3,49 zł"
+# niezależnie od banku/appki. Używany jako filtr antyspamowy: powiadomienie push BEZ
+# takiego wzorca to prawie na pewno nie jest prawdziwa transakcja (tylko marketing/info),
+# więc odrzucamy je PRZED wysłaniem czegokolwiek do AI - oszczędza zapytanie i chroni
+# przed zmyślonymi/fałszywymi wpisami w bazie.
+WZORZEC_KWOTY = re.compile(r"-?[0-9]+[.,][0-9]{2}")
+
+
+# --- PROCESOR PACZEK ---
+def przetworz_powiadomienie_push(tresc_pusha, uzytkownik_id):
+    logging.info(f"📱 Przetwarzanie pusha dla użytkownika ID: {uzytkownik_id}")
+    try:
         dzisiejsza_data = datetime.now().strftime("%Y-%m-%d")
 
-        # --- 1. AUTOMATYCZNE FILTROWANIE SUROWYCH PRZELEWÓW MILLENNIUM ---
-        if "MILLENNIUM" in tresc_pusha.upper() and "PRZELEW" in tresc_pusha.upper():
-            logging.info("ℹ️ System: Wykryto surowy przelew z Millennium. Przetwarzam automatycznie (bez AI)...")
+        # --- FILTR ANTYSPAMOWY (uniwersalny, dla DOWOLNEJ appki/banku): powiadomienie
+        # bez rozpoznawalnej kwoty to prawie na pewno marketing/info, nie transakcja
+        # (np. "Odzyskaj nawet do 40 zł zwrotu w sklepie Allegro" - liczba tam jest,
+        # ale to reklama, nie płatność - dlatego to tylko pierwsza linia obrony,
+        # kwota=0 z AI jest odrzucana osobno niżej).
+        if not WZORZEC_KWOTY.search(tresc_pusha):
+            logging.info(f"🚫 Zignorowano powiadomienie bez rozpoznawalnej kwoty (prawdopodobnie nie-transakcyjne): {tresc_pusha!r}")
+            return
 
-            # Wyciągamy kwotę z tekstu powiadomienia
-            kwota_match = re.search(r"Kwota:\s*([0-9.,]+)", tresc_pusha)
-            if not kwota_match:
-                logging.error("⚠️ Nie udało się wyciągnąć kwoty z powiadomienia Millennium. Przerywam.")
-                return
-
-            kwota = float(kwota_match.group(1).replace(',', '.'))
-
-            # Ustalamy kierunek, opis i nową kategorię
-            if "PRZYCHODZĄCY" in tresc_pusha.upper():
-                typ_transakcji = "PRZYCHOD"
-                kategoria_id = 13  # Kategoria 'Przychody' z bazy
-                sklep = "Przelew Przychodzący Millennium"
-            else:
-                typ_transakcji = "WYDATEK"
-                kategoria_id = 12  # Kategoria 'Inne'
-                sklep = "Przelew Wychodzący Millennium"
-
-            zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, "MILLENNIUM")
-            return  # Kończymy przetwarzanie sukcesem
-
-        # --- 2. STANDARDOWA ŚCIEŻKA DLA INNYCH POWIADOMIEŃ (NP. PORTFEL GOOGLE) ---
         bezpieczna_tresc_dla_ai = cenzuruj_wrazliwe_dane(tresc_pusha)
-
-        logging.info("🚀 Przekazuję bezpieczną paczkę do AI...")
         dane_z_ai = analizuj_powiadomienie_przez_ai(bezpieczna_tresc_dla_ai)
 
-        if dane_z_ai and isinstance(dane_z_ai, dict) and "transakcje" in dane_z_ai:
+        if dane_z_ai and "transakcje" in dane_z_ai:
             lista_transakcji = dane_z_ai["transakcje"]
-            linie = tresc_pusha.strip().split('\n')
 
             for transakcja in lista_transakcji:
                 kwota = transakcja.get("kwota")
@@ -141,25 +146,41 @@ def przetworz_powiadomienie_push(tresc_pusha):
                 kategoria_id = transakcja.get("kategoria_id", 12)
                 typ_transakcji = transakcja.get("typ", "WYDATEK")
 
-                # --- SUPERELASTYCZNA DETEKCJA ŹRÓDŁA ---
-                zrodlo = "NIEZNANE"
-                for linia in linie:
-                    if str(kwota).replace('.', ',') in linia or str(kwota) in linia:
-                        if "MILLENNIUM" in linia.upper():
-                            zrodlo = "MILLENNIUM"
-                            break
-                        elif "PORTFEL" in linia.upper() or "GOOGLE" in linia.upper():
-                            zrodlo = "GOOGLE"
-                            break
+                # Odporne parsowanie kwoty - AI czasem zwraca "13,00" jako string z przecinkiem
+                # (bo tak wygląda w oryginalnym tekście powiadomienia), a float() na przecinku
+                # rzuca ValueError. Bez tego jedna zła transakcja wywalała WYJĄTKIEM CAŁĄ funkcję
+                # (łapany cicho przez zewnętrzny except, bez żadnego śladu poza logiem).
+                try:
+                    kwota_num = float(str(kwota).replace(',', '.')) if kwota is not None else None
+                    if kwota_num is not None:
+                        # WAŻNE: wartość bezwzględna - AI (Gemini/Groq) mimo instrukcji w prompcie
+                        # ("kwota ZAWSZE DODATNIA") czasem i tak przepisuje minus 1:1 z surowego
+                        # tekstu powiadomienia banku ("Kwota: -49,00 USD" -> -49.0). Kierunek
+                        # transakcji i tak wyraża wyłącznie pole "typ", więc znak liczby jest
+                        # zbędny - a bez normalizacji taka transakcja wpadała w warunek
+                        # "kwota_num > 0" poniżej i była CAŁKOWICIE ODRZUCANA zamiast zapisana.
+                        kwota_num = abs(kwota_num)
+                except (TypeError, ValueError):
+                    kwota_num = None
 
-                if kwota is not None and sklep:
-                    zapisz_lub_scal_transakcje(kategoria_id, kwota, dzisiejsza_data, sklep, typ_transakcji, zrodlo)
+                # Odrzucamy transakcje z zerową/brakującą/niepoprawną kwotą (zmyślone przez AI z niejasnego tekstu)
+                if kwota_num is not None and kwota_num > 0 and sklep:
+                    # zrodlo jest teraz UNIWERSALNE - zawsze "POWIADOMIENIE", bez rozróżniania
+                    # konkretnych appek/banków. Scalanie duplikatów (lepsza nazwa nadpisuje
+                    # generyczną) działa teraz przez jakość opisu, nie przez nazwę źródła -
+                    # patrz zapisz_lub_scal_transakcje.
+                    zapisz_lub_scal_transakcje(uzytkownik_id, kategoria_id, kwota_num, dzisiejsza_data, sklep, typ_transakcji, "POWIADOMIENIE")
+                else:
+                    logging.warning(f"🚫 Odrzucono transakcję z niewiarygodnymi danymi (kwota={kwota!r}, sklep={sklep!r}): {tresc_pusha!r}")
         else:
-            logging.error("❌ Nie udało się sparsować paczki wiadomości przez AI.")
-
+            # WAŻNE: to jest przypadek, który wcześniej ginął całkowicie po cichu -
+            # zarówno Gemini, jak i zapasowy Groq nie zwróciły użytecznego JSON-a
+            # (np. AI się pogubiło, limit, błąd sieci) - HTTP i tak zwracał 200 "success"
+            # do telefonu, ale transakcja NIGDY nie trafiała do bazy. Teraz przynajmniej
+            # widać to jednoznacznie w finance_app.log.
+            logging.error(f"❌ AI (Gemini + zapasowy Groq) nie zwróciło użytecznych danych dla powiadomienia: {tresc_pusha!r}")
     except Exception as e:
-        # Ten fragment złapie KAŻDY błąd i precyzyjnie opisze go w logu
-        logging.exception(f"💥 Krytyczny błąd wewnątrz procesora pushy: {e}")
+        logging.exception(f"💥 Błąd wewnątrz procesora pushy: {e}")
 
 
 if __name__ == "__main__":
@@ -167,4 +188,5 @@ if __name__ == "__main__":
     if os.path.exists(sciezka_pusha):
         with open(sciezka_pusha, 'r', encoding='utf-8') as f:
             surowy_push = f.read().strip()
-        przetworz_powiadomienie_push(surowy_push)
+        # Test ręczny z konsoli - podmień 1 na prawdziwe id użytkownika z bazy jeśli trzeba
+        przetworz_powiadomienie_push(surowy_push, 1)

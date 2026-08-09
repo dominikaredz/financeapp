@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejestracja - Budget Planner AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-wrapper container">
+        <div class="pastel-card auth-card mx-auto">
+            <div class="auth-logo">
+                <span class="text-muted text-uppercase small">🗓️ Budget Planner AI</span>
+                <h3 class="fw-bold mt-1" style="color: #615d57;">Załóż konto</h3>
+            </div>
+
+            {% if blad %}
+            <div class="alert-pastel">{{ blad }}</div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('zarejestruj') }}">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Imię</label>
+                    <input type="text" name="imie" class="form-control form-control-pastel" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">E-mail</label>
+                    <input type="email" name="email" class="form-control form-control-pastel" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small text-muted">Hasło (min. 8 znaków)</label>
+                    <input type="password" name="haslo" class="form-control form-control-pastel" minlength="8" required>
+                </div>
+                <button type="submit" class="btn btn-pastel btn-pastel-primary w-100">Utwórz konto</button>
+            </form>
+
+            <div class="auth-link">
+                Masz już konto? <a href="{{ url_for('zaloguj') }}">Zaloguj się</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

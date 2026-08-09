@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Planner AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+
+    <div class="container py-4">
+
+        <div class="pasek-uzytkownika">
+            <span class="imie-uzytkownika">👋 {{ imie }}</span>
+            <a href="{{ url_for('wyloguj') }}" class="btn btn-pastel btn-pastel-outline btn-sm">Wyloguj</a>
+        </div>
+
+        <div class="row mb-4 text-center">
+            <div class="col">
+                <span class="text-muted text-uppercase small tracking-wider">🗓️ PythonAnywhere Live Wallet</span>
+                <h2 class="fw-bold mt-1" style="color: #615d57;">MONTHLY BUDGET PLANNER</h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-4">
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-overview">
+                        <span>Budget Overview</span>
+                        <span>📊</span>
+                    </div>
+
+                    <form method="GET" action="{{ url_for('strona_glowna') }}" class="row g-2 mb-2">
+                        <input type="hidden" name="f_kategoria" value="{{ filtry.kategoria }}">
+                        <input type="hidden" name="f_typ" value="{{ filtry.typ }}">
+                        <input type="hidden" name="f_od" value="{{ filtry.od }}">
+                        <input type="hidden" name="f_do" value="{{ filtry.do }}">
+                        <input type="hidden" name="f_szukaj" value="{{ filtry.szukaj }}">
+                        <div class="col-6">
+                            <input type="date" name="w_od" value="{{ wykres_filtry.od }}" class="form-control form-control-pastel form-control-sm" onchange="this.form.submit()">
+                        </div>
+                        <div class="col-6">
+                            <input type="date" name="w_do" value="{{ wykres_filtry.do }}" class="form-control form-control-pastel form-control-sm" onchange="this.form.submit()">
+                        </div>
+                        <div class="col-12 text-center">
+                            <a href="{{ url_for('strona_glowna', w_od='', w_do='', f_kategoria=filtry.kategoria, f_typ=filtry.typ, f_od=filtry.od, f_do=filtry.do, f_szukaj=filtry.szukaj) }}" class="text-muted small">Pokaż cały okres</a>
+                        </div>
+                    </form>
+
+                    <div class="chart-container">
+                        <canvas id="budgetChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-income">
+                        <span>Cash Flow Summary</span>
+                        <span>💸</span>
+                    </div>
+                    <div class="text-muted small text-center mb-2">📅 {{ okres_etykieta }}</div>
+                    <div class="d-flex justify-content-between my-2">
+                        <span>Total Income</span>
+                        <strong class="text-success">+{{ "%.2f"|format(podsumowanie.przychod) }} PLN</strong>
+                    </div>
+                    <div class="d-flex justify-content-between my-2">
+                        <span>Total Expenses</span>
+                        <strong class="text-danger">-{{ "%.2f"|format(podsumowanie.wydatek) }} PLN</strong>
+                    </div>
+                    <hr style="border-top: 1px dashed #d1cbdc;">
+                    <div class="d-flex justify-content-between my-2 fw-bold">
+                        <span>Difference</span>
+                        <span>{{ "%.2f"|format(podsumowanie.przychod - podsumowanie.wydatek) }} PLN</span>
+                    </div>
+                </div>
+
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-tools">
+                        <span>Dodaj wyciąg CSV</span>
+                        <span>📥</span>
+                    </div>
+                    <div id="bannerImportu" class="alert-pastel" style="display:none;"></div>
+                    <form method="POST" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
+                        <div class="upload-dropzone mb-3">
+                            <input type="file" name="plik_csv" accept=".csv" class="form-control form-control-pastel" required>
+                            <div class="mt-2">Plik CSV z wyciągiem bankowym</div>
+                        </div>
+                        <button type="submit" class="btn btn-pastel btn-pastel-primary w-100">Importuj</button>
+                        <div class="text-muted small mt-2 text-center">
+                            Import działa w tle - możesz zamknąć/odświeżyć stronę, wrócisz i zobaczysz postęp.
+                        </div>
+                    </form>
+                </div>
+
+                <div class="pastel-card mt-3">
+    <div class="card-header-custom bg-tools">
+        <span>Rozbij e-paragon Kaufland</span>
+        <span>🧾</span>
+    </div>
+    <form method="POST" action="{{ url_for('rozbij_paragon') }}" enctype="multipart/form-data">
+        <div class="upload-dropzone mb-3">
+            <input type="file" name="plik_paragon" accept="image/jpeg,image/png,image/webp" class="form-control form-control-pastel" required>
+            <div class="mt-2">Zdjęcie lub screenshot e-paragonu z aplikacji Kaufland</div>
+        </div>
+        <button type="submit" class="btn btn-pastel btn-pastel-primary w-100">Rozbij paragon za pomocą AI</button>
+    </form>
+</div>
+
+                {% if webhook_url %}
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-expense">
+                        <span>Twój link powiadomień push</span>
+                        <span>🔑</span>
+                    </div>
+                    <div class="webhook-box">{{ webhook_url }}</div>
+                    <div class="text-muted small mt-2">
+                        Ustaw ten URL w Macrodroid (zamiast starego). Każdy Twój login ma swój własny link -
+                        nie udostępniaj go nikomu.
+                    </div>
+                    <a href="{{ url_for('instrukcja_macrodroid') }}" class="d-block text-center small mt-2" style="color: var(--accent-dark); font-weight: 600;">
+                        📖 Jak skonfigurować Macrodroid krok po kroku →
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <div class="col-lg-8">
+                <div class="pastel-card">
+                    <div class="card-header-custom bg-expense">
+                        <span>Live Transactions Feed</span>
+                        <span>👛</span>
+                    </div>
+
+                    <form method="GET" action="{{ url_for('strona_glowna') }}" class="row g-2 mb-3">
+                        <input type="hidden" name="w_od" value="{{ wykres_filtry.od }}">
+                        <input type="hidden" name="w_do" value="{{ wykres_filtry.do }}">
+                        <div class="col-6 col-lg-2 filtr-pole">
+                            <select name="f_kategoria" class="form-select form-control-pastel form-select-sm" onchange="this.form.submit()">
+                                <option value="">Kategoria</option>
+                                <option value="rozbite" {% if filtry.kategoria == 'rozbite' %}selected{% endif %}>🧾 Rozbite paragony</option>
+                                {% for kat in kategorie %}
+                                <option value="{{ kat.id }}" {% if filtry.kategoria == kat.id|string %}selected{% endif %}>{{ kat.nazwa_kategorii }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-2 filtr-pole">
+                            <select name="f_typ" class="form-select form-control-pastel form-select-sm" onchange="this.form.submit()">
+                                <option value="">Typ</option>
+                                <option value="WYDATEK" {% if filtry.typ == 'WYDATEK' %}selected{% endif %}>Wydatek</option>
+                                <option value="PRZYCHOD" {% if filtry.typ == 'PRZYCHOD' %}selected{% endif %}>Przychód</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-2 filtr-pole">
+                            <input type="date" name="f_od" value="{{ filtry.od }}" class="form-control form-control-pastel form-control-sm" onchange="this.form.submit()">
+                        </div>
+                        <div class="col-6 col-lg-2 filtr-pole">
+                            <input type="date" name="f_do" value="{{ filtry.do }}" class="form-control form-control-pastel form-control-sm" onchange="this.form.submit()">
+                        </div>
+                        <div class="col-9 col-lg-3 filtr-pole">
+                            <input type="text" name="f_szukaj" value="{{ filtry.szukaj }}" placeholder="Szukaj po opisie..." class="form-control form-control-pastel form-control-sm">
+                        </div>
+                        <div class="col-3 col-lg-1">
+                            <button type="submit" class="btn btn-pastel btn-pastel-primary btn-sm filtr-przycisk w-100" title="Szukaj" aria-label="Szukaj">🔍</button>
+                        </div>
+                        {% if filtry.kategoria or filtry.typ or filtry.od or filtry.do or filtry.szukaj %}
+                        <div class="col-12">
+                            <a href="{{ url_for('strona_glowna') }}" class="text-muted small">✕ Wyczyść filtry</a>
+                        </div>
+                        {% endif %}
+                    </form>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle table-transakcje">
+                            <colgroup>
+                                <col style="width: 10%;">
+                                <col style="width: 28%;">
+                                <col style="width: 24%;">
+                                <col style="width: 16%;">
+                                <col style="width: 14%;">
+                                <col style="width: 8%;">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Miejsce / Opis</th>
+                                    <th>Kategoria</th>
+                                    <th>Kwota</th>
+                                    <th>Źródło</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for t in transakcje %}
+                                <tr>
+                                    <td class="text-muted" style="font-size: 0.85rem;">{{ t.data }}</td>
+                                    <td><strong>{{ t.opis }}</strong></td>
+                                    <td>
+                                        {% if t.kategoria_nazwa %}
+                                        <span class="badge-type badge-{{ t.typ }}">{{ t.kategoria_nazwa }}</span>
+                                        {% elif t.pozycje %}
+                                        <span class="badge-type badge-rozwijalny" style="background-color:#e3dec3; color:#594726;"
+                                              data-bs-toggle="collapse" data-bs-target="#pozycje-{{ t.id }}" role="button">
+                                            🧾 Rozbity ({{ t.pozycje|length }}) ▾
+                                        </span>
+                                        {% else %}
+                                        <span class="badge-type" style="background-color:#e3dec3; color:#594726;">🧾 Rozbity paragon</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="fw-bold {% if t.typ == 'WYDATEK' %}text-danger{% else %}text-success{% endif %}">
+                                        {% if t.typ == 'WYDATEK' %}-{% else %}+{% endif %}{{ "%.2f"|format(t.kwota) }} zł
+                                    </td>
+                                    <td>
+                                        {% set zr_skrot = {'POWIADOMIENIE': 'push', 'CSV': 'csv', 'PARAGON': 'paragon'} %}
+                                        {% set zrodlo_bazowe = t.zrodlo.replace('_SCALONE', '') %}
+                                        <span class="text-muted small">{{ zr_skrot.get(zrodlo_bazowe, zrodlo_bazowe|lower) }}{% if '_SCALONE' in t.zrodlo %} 🔄{% endif %}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn-icon-edit"
+                                                data-bs-toggle="modal" data-bs-target="#modalEdycji"
+                                                data-id="{{ t.id }}"
+                                                data-opis="{{ t.opis }}"
+                                                data-kategoria-id="{{ t.kategoria_id or '' }}"
+                                                title="Edytuj">
+                                            ✏️
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% if t.pozycje %}
+                                <tr>
+                                    <td></td>
+                                    <td colspan="5" class="p-0">
+                                        <div class="collapse" id="pozycje-{{ t.id }}">
+                                            <div class="pozycje-paragonu pt-0 pb-3">
+                                                {% for p in t.pozycje %}
+                                                <span class="pozycja-chip">{{ p.nazwa_pozycji }} · {{ "%.2f"|format(p.kwota) }} zł · {{ p.kategoria_nazwa }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">Brak wpisów pasujących do filtrów. 📱</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if liczba_stron > 1 %}
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span class="text-muted small">
+                            Strona {{ strona }} z {{ liczba_stron }} ({{ razem_transakcji }} transakcji)
+                        </span>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('strona_glowna', strona=strona-1, f_kategoria=filtry.kategoria, f_typ=filtry.typ, f_od=filtry.od, f_do=filtry.do, f_szukaj=filtry.szukaj, w_od=wykres_filtry.od, w_do=wykres_filtry.do) }}"
+                               class="btn btn-pastel btn-pastel-outline btn-sm {% if strona <= 1 %}disabled{% endif %}">‹ Poprzednia</a>
+                            <a href="{{ url_for('strona_glowna', strona=strona+1, f_kategoria=filtry.kategoria, f_typ=filtry.typ, f_od=filtry.od, f_do=filtry.do, f_szukaj=filtry.szukaj, w_od=wykres_filtry.od, w_do=wykres_filtry.do) }}"
+                               class="btn btn-pastel btn-pastel-outline btn-sm {% if strona >= liczba_stron %}disabled{% endif %}">Następna ›</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal edycji transakcji -->
+    <div class="modal fade" id="modalEdycji" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content" style="border-radius: 20px; border: none;">
+                <form method="POST" id="formEdycji">
+                    <div class="modal-header" style="border-bottom: 1px solid #f5f2eb;">
+                        <h5 class="modal-title fw-bold" style="color: #615d57;">Edytuj transakcję</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Tytuł / opis</label>
+                            <input type="text" name="opis" id="edytujOpis" class="form-control form-control-pastel" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Kategoria</label>
+                            <select name="kategoria_id" id="edytujKategoria" class="form-select form-control-pastel" required>
+                                {% for kat in kategorie %}
+                                <option value="{{ kat.id }}">{{ kat.nazwa_kategorii }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="border-top: 1px solid #f5f2eb;">
+                        <button type="button" class="btn btn-pastel btn-pastel-outline" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-pastel btn-pastel-primary">Zapisz zmiany</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Odpytywanie statusu importu CSV w tle - odświeża stronę automatycznie po zakończeniu
+        function sprawdzStatusImportu() {
+            fetch("{{ url_for('import_status') }}")
+                .then(r => r.json())
+                .then(dane => {
+                    const banner = document.getElementById('bannerImportu');
+                    if (dane.stan === 'w_toku') {
+                        banner.style.display = 'block';
+                        banner.textContent = `⏳ Import w toku: ${dane.przetworzone || 0} / ${dane.razem || '?'} transakcji skategoryzowanych...`;
+                        setTimeout(sprawdzStatusImportu, 4000);
+                    } else if (dane.stan === 'gotowe') {
+                        banner.style.display = 'block';
+                        banner.textContent = '✅ Import zakończony! Odświeżam stronę...';
+                        setTimeout(() => location.reload(), 1500);
+                    } else if (dane.stan === 'blad') {
+                        banner.style.display = 'block';
+                        banner.textContent = '❌ Import napotkał błąd: ' + (dane.komunikat || 'nieznany');
+                    }
+                    // stan === 'brak' -> nic nie pokazujemy, żadnego importu w toku
+                });
+        }
+        sprawdzStatusImportu();
+        // Wypełnienie modala edycji danymi klikniętego wiersza
+        const modalEdycji = document.getElementById('modalEdycji');
+        modalEdycji.addEventListener('show.bs.modal', function (event) {
+            const btn = event.relatedTarget;
+            const id = btn.getAttribute('data-id');
+            document.getElementById('edytujOpis').value = btn.getAttribute('data-opis');
+            document.getElementById('edytujKategoria').value = btn.getAttribute('data-kategoria-id');
+            document.getElementById('formEdycji').action = '/edytuj-transakcja/' + id;
+        });
+
+        const ctx = document.getElementById('budgetChart').getContext('2d');
+        const budgetChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: {{ wykres_dane.labels|tojson }},
+                datasets: [{
+                    data: {{ wykres_dane.sumy|tojson }},
+                    backgroundColor: [
+                        '#c7dbcb', '#ebd4cb', '#f7e7c4', '#d2cbd4',
+                        '#edd1d8', '#cfe0e8', '#e3dec3', '#f0dbcf'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 15, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
