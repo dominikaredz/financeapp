@@ -4,7 +4,7 @@
 # dla dowolnej appki, bez żadnego hardkodowania nazw banków w kodzie).
 
 URL="https://domiredz00.pythonanywhere.com/webhook/push"
-TOKEN="RyTYbiCwdkOd4cGTBn3X7dPjoD_8O8I5"
+TOKEN="..."
 
 echo "1) Zwykła płatność kartą (appka banku ZNA nazwę sklepu) -> powinno zapisać się od razu jako 'Biedronka'"
 curl -s -X POST -G "$URL" \
